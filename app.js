@@ -24,108 +24,70 @@ app.post('/', (request, response) => {
             var workbook = XLSX.readFile(f.path);
             // fs.writeFileSync('./uploads/workbook.txt', JSON.stringify(workbook, undefined, 2));
 
+            var result = {};
+            var LOOK_UP_TYPE_SHEET = "Lookup Types";
 
-            var target_sheet = "Lookup Types";
+            result = to_json(LOOK_UP_TYPE_SHEET);
 
-            var worksheet = workbook.Sheets[target_sheet];
-            var data = [];
-            if (worksheet) {
-                var headers = {};
+            var LOOK_UP_VALUE_SHEET = "Lookup Values";
 
-                for (z in worksheet) {
-                    var tt = 0;
-                    for (var i = 0; i < z.length; i++) {
-                        if (!isNaN(z[i])) {
-                            tt = i;
-                            break;
-                        }
-                    };
-                    var col = z.substring(0, tt);
-                    var row = parseInt(z.substring(tt));
-                    var value = worksheet[z].v;
+            result = to_json(LOOK_UP_VALUE_SHEET);
 
-                    if (row == 1 && value) {
-                        headers[col] = value;
-                        continue;
-                    }
+            var applicationIDMap = {};
+            var moduleIDMap = {};
 
-                    if (!data[row]) {
-                        data[row] = {};
-                    }
-                    data[row][headers[col]] = value;
+            result[LOOK_UP_TYPE_SHEET].forEach((element) => {
+                var LOOK_UP_TYPE = LookUpType.LOOK_UP_TYPE;
+                var lookUpType = element[LOOK_UP_TYPE];
+                var lookupTypeStatus = element[LookUpType.LOOK_UP_TYPE_STATUS];
+                if (lookUpType && lookupTypeStatus.toLowerCase() === 'new') {
+                    var custLevel = level(element[LookUpType.CUSTOMIZATION_LEVEL]);
+                    var lookUpTypeMeaning = element[LookUpType.LOOK_UP_TYPE_MEANING];
+                    var lookUpTypeDescription = element[LookUpType.LOOK_UP_TYPE_DESCRIPTION];
+                    
 
+                    fs.appendFileSync('./lookup.txt',
+                        `INSERT INTO FND_LOOKUP_TYPES VALUES('${lookUpType}',1059,NULL,'SEED_DATA_FROM_APPLICATION',SYSDATE,-1,'MODULE_ID',1,${custLevel},1,'N','SDF_FILE');\n`);
+                    fs.appendFileSync('./lookup.txt',
+                        `INSERT INTO FND_LOOKUP_TYPES_TL VALUES('${lookUpType}',1059,'US','US','Admit Type','${lookUpTypeMeaning}','${lookUpTypeDescription}','SEED_DATA_FROM_APPLICATION',sysdate,'SEED_DATA_FROM_APPLICATION',sysdate,-1,1,1,'N','SDF_FILE');\n\n`);
                 }
-                data.shift();
-                data.shift();
+            });
 
-                console.log(data);
-                console.log(XLSX.utils.sheet_to_json(worksheet));
+            result[LOOK_UP_VALUE_SHEET].forEach((element) => {
+                var LOOK_UP_TYPE = LookUpType.LOOK_UP_TYPE;
+                var lookUpType = element[LOOK_UP_TYPE];
+                var lookupValueStatus = element[LookUpValue.LOOK_UP_VALUE_STATUS];
+                if (lookUpType && lookupValueStatus.toLowerCase() === 'new') {
+                    var lookUpValueMeaning = element[LookUpValue.LOOK_UP_VALUE_MEANING];
+                    var lookUpValueDescription = element[LookUpType.LOOK_UP_VALUE_DESCRIPTION];
+                    var lookUpValue = element[LookUpValue.LOOK_UP_VALUE];
+                    var displaySequence = element[LookUpValue.DISPLAY_SEQUENCE];
+                    var enabledFlag = element[LookUpValue.ENABLED_FLAG];
 
-                fs.writeFileSync('./lookup.txt', '');
-                for (var i = 0; i < data.length; i++) {
-                    var LOOK_UP_TYPE = LookUpType.LOOK_UP_TYPE;
-                    var lookUpType = data[i][LOOK_UP_TYPE];
-                    if (lookUpType) {
-                        var custLevel = level(data[i][LookUpType.CUSTOMIZATION_LEVEL]);
-                        var lookUpTypeMeaning = data[i][LookUpType.LOOK_UP_TYPE_MEANING];
-                        var lookUpTypeDescription = data[i][LookUpType.LOOK_UP_TYPE_DESCRIPTION];
-
-                        fs.appendFileSync('./lookup.txt',
-                            `INSERT INTO FND_LOOKUP_TYPES VALUES('${lookUpType}',1059,NULL,'SEED_DATA_FROM_APPLICATION',SYSDATE,-1,'MODULE_ID',1,${custLevel},1,'N','SDF_FILE');\n`);
-                        fs.appendFileSync('./lookup.txt',
-                            `INSERT INTO FND_LOOKUP_TYPES_TL VALUES('${lookUpType}',1059,'US','US','Admit Type','${lookUpTypeMeaning}','${lookUpTypeDescription}','SEED_DATA_FROM_APPLICATION',sysdate,'SEED_DATA_FROM_APPLICATION',sysdate,-1,1,1,'N','SDF_FILE');\n\n`);
-                    }
+                    fs.appendFileSync('./lookup.txt',
+                        `INSERT INTO FND_LOOKUP_VALUES_B VALUES('${lookUpType}','${lookUpValue}',10549,0,${enabledFlag},NULL,NULL,${displaySequence},'SEED_DATA_FROM_APPLICATION',SYSDATE,'SEED_DATA_FROM_APPLICATION',SYSDATE,-1,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,1,1,'N','SDF_FILE');\n`);
+                    fs.appendFileSync('./lookup.txt',
+                        `INSERT INTO FND_LOOKUP_VALUES_TL VALUES('${lookUpType}','${lookUpValue}',10549,0,'US','${lookUpValueMeaning}','${lookUpValueDescription}','US','SEED_DATA_FROM_APPLICATION',sysdate,'SEED_DATA_FROM_APPLICATION',sysdate,-1,1,1,'N','SDF_FILE');\n\n`);
                 }
+            });
+
+
+            function to_json(sheetName) {
+                var workSheet = workbook.Sheets[sheetName];
+                // workbook.SheetNames.forEach(function (sh) {
+                //     if (sh === sheetName) {
+                var roa = XLSX.utils.sheet_to_row_object_array(workSheet);
+                if (roa.length > 0) {
+                    result[sheetName] = roa;
+                }
+                //     }
+                // });
+
+                return result;
             }
-            target_sheet  = "Lookup Values";
-            worksheet = workbook.Sheets[target_sheet];
-            data = [];
-            if (worksheet) {
-                var headers = {};
 
-                for (z in worksheet) {
-                    var tt = 0;
-                    for (var i = 0; i < z.length; i++) {
-                        if (!isNaN(z[i])) {
-                            tt = i;
-                            break;
-                        }
-                    };
-                    var col = z.substring(0, tt);
-                    var row = parseInt(z.substring(tt));
-                    var value = worksheet[z].v;
+            function getID(){
 
-                    if (row == 1 && value) {
-                        headers[col] = value;
-                        continue;
-                    }
-
-                    if (!data[row]) {
-                        data[row] = {};
-                    }
-                    data[row][headers[col]] = value;
-
-                }
-                data.shift();
-                data.shift();
-
-                console.log(data);
-
-                // fs.writeFileSync('./uploads/lookup.txt', '');
-                for (var i = 0; i < data.length; i++) {
-                    var LOOK_UP_TYPE = LookUpType.LOOK_UP_TYPE;
-                    var lookUpType = data[i][LOOK_UP_TYPE];
-                    if (lookUpType) {
-                        var lookUpValueMeaning = data[i][LookUpValue.LOOK_UP_VALUE_MEANING];
-                        var lookUpValueDescription = data[i][LookUpType.LOOK_UP_VALUE_DESCRIPTION];
-                        var lookUpValue = data[i][LookUpValue.LOOK_UP_VALUE];
-
-                        fs.appendFileSync('./lookup.txt',
-                            `INSERT INTO FND_LOOKUP_VALUES_B VALUES('${lookUpType}','${lookUpValue}',10549,0,'Y',NULL,NULL,0,'SEED_DATA_FROM_APPLICATION',SYSDATE,'SEED_DATA_FROM_APPLICATION',SYSDATE,-1,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,1,1,'N','SDF_FILE');\n`);
-                        fs.appendFileSync('./lookup.txt',
-                            `INSERT INTO FND_LOOKUP_VALUES_TL VALUES('${lookUpType}','${lookUpValue}',10549,0,'US','${lookUpValueMeaning}','${lookUpValueDescription}','US','SEED_DATA_FROM_APPLICATION',sysdate,'SEED_DATA_FROM_APPLICATION',sysdate,-1,1,1,'N','SDF_FILE');\n\n`);
-                    }
-                }
             }
 
 
