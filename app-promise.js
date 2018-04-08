@@ -3,6 +3,7 @@ const formidable = require('formidable');
 const fs = require('fs');
 const oracledb = require('oracledb');
 const XLSX = require('xlsx');
+const _ = require('lodash');
 
 var LookUpType = require('./models/LookUpType');
 var LookUpValue = require('./models/LookUpValue');
@@ -11,6 +12,11 @@ var app = express();
 
 var port = process.env.PORT || 3000;
 
+var filePath = './Lookup.sql';
+
+var uploadedFile = '';
+
+app.use(express.static(__dirname + '/public'));
 
 app.get('/', (request, response) => {
     response.sendFile(__dirname + '/index.html');
@@ -33,16 +39,22 @@ app.post('/', (request, response) => {
 
             result = to_json(LOOK_UP_VALUE_SHEET);
 
+            var username = _.isEmpty(fields.username) ? "fusion" : fields.username;
+            var password = _.isEmpty(fields.password) ? "fusion" : fields.password;
+            var hostname = _.isEmpty(fields.hostname) ? "slcak358.us.oracle.com" : fields.hostname;
+            var sid = _.isEmpty(fields.sid) ? "ems2658" : fields.sid;
+            debugger;
+
             var connectionPromise = oracledb.getConnection({
-                user: "fusion",
-                password: "fusion",
-                connectString: "indl136033.in.oracle.com:1522/in136033"
+                user: username,
+                password: password,
+                connectString: `${hostname}/${sid}`
             });
 
-            var filePath = './Lookup.sql';
 
 
-            fs.writeFileSync(filePath,'');
+
+            fs.writeFileSync(filePath, '');
 
             result[LOOK_UP_TYPE_SHEET].forEach((element) => {
                 var LOOK_UP_TYPE = LookUpType.LOOK_UP_TYPE;
@@ -53,27 +65,26 @@ app.post('/', (request, response) => {
                     var lookUpTypeMeaning = element[LookUpType.LOOK_UP_TYPE_MEANING];
                     var lookUpTypeDescription = element[LookUpType.LOOK_UP_TYPE_DESCRIPTION];
 
-                    connectionPromise.then((connection)=>{
-                        return connection.execute(`select VIEW_APPLICATION_ID,MODULE_ID from FND_LOOKUP_TYPES where LOOKUP_TYPE = :id`,
-                            [lookUpType],
-                            {
-                                outFormat: oracledb.ARRAY   
-                            }
-                            );
-                    }).then((resolve)=>{
-                            ids = resolve.rows[0];
-                            console.log(ids);
-                            var applicationID = ids[0];
-                            var moduleID = ids[1];
-                            console.log(lookUpType);
-                            fs.appendFileSync(filePath,
-                                `INSERT INTO FND_LOOKUP_TYPES VALUES('${lookUpType}',${applicationID},NULL,'SEED_DATA_FROM_APPLICATION',SYSDATE,-1,${moduleID},1,${custLevel},1,'N','SDF_FILE');\n`);
-                            fs.appendFileSync(filePath,
-                                `INSERT INTO FND_LOOKUP_TYPES_TL VALUES('${lookUpType}',${applicationID},'US','US','Admit Type','${lookUpTypeMeaning}','${lookUpTypeDescription}','SEED_DATA_FROM_APPLICATION',sysdate,'SEED_DATA_FROM_APPLICATION',sysdate,-1,1,1,'N','SDF_FILE');\n\n`);
-                            // doRelease(connectionPromise.getConnection());
-                    }).catch((reject)=>{
+                    connectionPromise.then((connection) => {
+                        return connection.execute(`select VIEW_APPLICATION_ID,MODULE_ID from FND_LOOKUP_TYPES where LOOKUP_TYPE = :id`, [lookUpType], {
+                            outFormat: oracledb.ARRAY
+                        });
+                    }).then((resolve) => {
+                        ids = resolve.rows[0];
+                        console.log(ids);
+                        var applicationID = ids[0];
+                        var moduleID = ids[1];
+                        console.log(lookUpType);
+                        fs.appendFileSync(filePath,
+                            `INSERT INTO FND_LOOKUP_TYPES VALUES('${lookUpType}',${applicationID},NULL,'SEED_DATA_FROM_APPLICATION',SYSDATE,-1,${moduleID},1,${custLevel},1,'N','SDF_FILE');\n`);
+                        fs.appendFileSync(filePath,
+                            `INSERT INTO FND_LOOKUP_TYPES_TL VALUES('${lookUpType}',${applicationID},'US','US','Admit Type','${lookUpTypeMeaning}','${lookUpTypeDescription}','SEED_DATA_FROM_APPLICATION',sysdate,'SEED_DATA_FROM_APPLICATION',sysdate,-1,1,1,'N','SDF_FILE');\n\n`);
+                        // doRelease(connectionPromise.getConnection());
+                    },(reject)=>{
+                        throw new Error(
+                            `Cannot establish the connection,Username:${username},Password:${password},Connection String:${hostname}/${sid} ${reject.message}`);
+                    }).catch((reject) => {
                         console.log(reject.message);
-                        doRelease(connectionPromise.getConnection());
                     });
 
                 }
@@ -88,15 +99,13 @@ app.post('/', (request, response) => {
                     var lookUpValueDescription = element[LookUpValue.LOOK_UP_VALUE_DESCRIPTION];
                     var lookUpValue = `'${element[LookUpValue.LOOK_UP_VALUE]}'`;
                     var displaySequence = element[LookUpValue.DISPLAY_SEQUENCE] || 1;
-                    var enabledFlag = element[LookUpValue.ENABLED_FLAG];
+                    var enabledFlag = `${element[LookUpValue.ENABLED_FLAG]}`;
 
-                  connectionPromise.then((connection)=>{
-                    return connection.execute(`select VIEW_APPLICATION_ID,MODULE_ID from FND_LOOKUP_TYPES where LOOKUP_TYPE = :id`,
-                            [lookUpType],
-                            {
-                                outFormat: oracledb.ARRAY
+                    connectionPromise.then((connection) => {
+                        return connection.execute(`select VIEW_APPLICATION_ID,MODULE_ID from FND_LOOKUP_TYPES where LOOKUP_TYPE = :id`, [lookUpType], {
+                            outFormat: oracledb.ARRAY
                         });
-                  }).then((resolve)=>{
+                    }).then((resolve) => {
                         ids = resolve.rows[0];
                         console.log(ids);
                         var applicationID = ids[0];
@@ -105,12 +114,11 @@ app.post('/', (request, response) => {
                             `INSERT INTO FND_LOOKUP_VALUES_B VALUES('${lookUpType}',${lookUpValue},${applicationID},0,${enabledFlag},NULL,NULL,${displaySequence},'SEED_DATA_FROM_APPLICATION',SYSDATE,'SEED_DATA_FROM_APPLICATION',SYSDATE,-1,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,1,1,'N','SDF_FILE');\n`);
                         fs.appendFileSync(filePath,
                             `INSERT INTO FND_LOOKUP_VALUES_TL VALUES('${lookUpType}',${lookUpValue},${applicationID},0,'US','${lookUpValueMeaning}','${lookUpValueDescription}','US','SEED_DATA_FROM_APPLICATION',sysdate,'SEED_DATA_FROM_APPLICATION',sysdate,-1,1,1,'N','SDF_FILE');\n\n`);
-                        // }
-                        // doRelease(connection);
-                  }).catch((reject)=>{
-                    console.log(reject.message);
-                    doRelease(connectionPromise.getConnection());
-                  });
+                    },(reject)=>{
+                        throw new Error(`Cannot establish the connection ${reject.message}`);
+                    }).catch((reject) => {
+                        console.log(reject.message);
+                    });
                 }
             });
 
@@ -128,7 +136,9 @@ app.post('/', (request, response) => {
             function doRelease(connection) {
                 connection.release(
                     function (err) {
-                        if (err) { console.error(err.message); }
+                        if (err) {
+                            console.error(err.message);
+                        }
                     }
                 );
             }
@@ -154,14 +164,15 @@ app.post('/', (request, response) => {
 
     form.on('fileBegin', function (name, file) {
         file.path = __dirname + '/' + file.name;
+        uploadedFile = file.name;
     });
 
     form.on('file', function (name, file) {
         console.log('Uploaded ' + file.name);
     });
 
-    // response.sendFile(__dirname + '/index.html');
-    response.download('./lookup.sql');
+
+    response.download(filePath);
 });
 
 app.listen(3000, '0.0.0.0', function () {
